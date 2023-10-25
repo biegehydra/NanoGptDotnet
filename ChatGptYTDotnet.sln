@@ -3,7 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34004.107
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatGptYTDotnet", "ChatGptYTDotnet\ChatGptYTDotnet.csproj", "{C532545E-74EB-4F0C-9F6C-E47B2AE26C61}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gpt", "src\Gpt\Gpt.csproj", "{F33B3265-9CC9-4783-978A-380B999987F9}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shared", "src\Shared\Shared.csproj", "{1E722FF6-BB20-4E4B-9DCC-43E4962300A0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigramModel", "src\BigramModel\BigramModel.csproj", "{A8C6AF83-AC8B-4180-8E1F-EF45FD4357B0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,10 +15,18 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{C532545E-74EB-4F0C-9F6C-E47B2AE26C61}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C532545E-74EB-4F0C-9F6C-E47B2AE26C61}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C532545E-74EB-4F0C-9F6C-E47B2AE26C61}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C532545E-74EB-4F0C-9F6C-E47B2AE26C61}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F33B3265-9CC9-4783-978A-380B999987F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F33B3265-9CC9-4783-978A-380B999987F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F33B3265-9CC9-4783-978A-380B999987F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F33B3265-9CC9-4783-978A-380B999987F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1E722FF6-BB20-4E4B-9DCC-43E4962300A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1E722FF6-BB20-4E4B-9DCC-43E4962300A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1E722FF6-BB20-4E4B-9DCC-43E4962300A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1E722FF6-BB20-4E4B-9DCC-43E4962300A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8C6AF83-AC8B-4180-8E1F-EF45FD4357B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8C6AF83-AC8B-4180-8E1F-EF45FD4357B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8C6AF83-AC8B-4180-8E1F-EF45FD4357B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8C6AF83-AC8B-4180-8E1F-EF45FD4357B0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
