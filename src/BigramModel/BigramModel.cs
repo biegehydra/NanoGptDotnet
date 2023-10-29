@@ -1,13 +1,19 @@
-﻿using System.Collections;
-using Shared;
+﻿using Shared;
 using TorchSharp;
 using TorchSharp.Modules;
 using Tensor = TorchSharp.torch.Tensor;
 using functional = TorchSharp.torch.nn.functional;
 using Device = TorchSharp.torch.Device;
+// ReSharper disable SuggestVarOrType_BuiltInTypes
+// ReSharper disable SuggestVarOrType_SimpleTypes
+// ReSharper disable SuggestVarOrType_Elsewhere
+// ReSharper disable InvalidXmlDocComment
 
-Device device = torch.cuda.is_available() ? torch.CUDA : torch.CPU;
-torch.InitializeDeviceType(DeviceType.CUDA);
+Device device = torch.cuda.is_available() ? torch.CPU : torch.CPU; // Change to CUDA if you have good gpu and install CUDA driver in shared csproj by uncommenting
+if (device.type == DeviceType.CUDA)
+{
+    torch.InitializeDeviceType(DeviceType.CUDA);
+}
 
 torch.manual_seed(1337);
 
@@ -54,15 +60,14 @@ for (int i = 0; i < Consts.MaxIterations; i++)
     optimizer.step();
 }
 
-var context = torch.zeros(new long[] { 1, 1 }, dtype: torch.ScalarType.Int64, device: device);
-var generation = (ArrayList)model.Generate(context, maxNewTokens: 500)[0].tolist();
-List<short> results = new List<short>();
-foreach (var obj in generation)
+Tensor context = torch.zeros(new long[] { 1, 1 }, dtype: torch.ScalarType.Int64, device: device);
+foreach (var token in model.Generate(context, maxNewTokens: 500))
 {
-    var scalar = (Scalar)obj;
-    results.Add(scalar.ToInt16());
+    Console.Write(encoder.Decode(token));
 }
-Console.WriteLine(encoder.Decode(results));
+Console.WriteLine("\n\n--Complete--");
+
+return;
 
 static float[] EstimateLoss(BigramLanguageModel model, DataSampler dataSampler, Device device)
 {
@@ -76,7 +81,7 @@ static float[] EstimateLoss(BigramLanguageModel model, DataSampler dataSampler, 
         {
             var (inputs, targets) = dataSampler.RandomSample(dataType, Consts.BatchSize, Consts.BlockSize, device);
             var (logits, loss) = model.Forward(inputs, targets);
-            losses[k] = loss?.item<float>() ?? 0f;
+            losses[k] = loss!.item<float>();
         }
         results[(int)dataType] = losses.mean().item<float>();
     }
@@ -95,7 +100,7 @@ public static class Consts
 
 public sealed class BigramLanguageModel : torch.nn.Module
 {
-    private Embedding _embedding;
+    private readonly Embedding _embedding;
 
     public BigramLanguageModel(string name, long vocabSize) : base(name)
     {
@@ -103,12 +108,12 @@ public sealed class BigramLanguageModel : torch.nn.Module
         register_module("token_embedding_table", _embedding);
     }
 
-    public (Tensor logits, Tensor? loss) Forward(Tensor idx, Tensor targets = null)
+    public (Tensor logits, Tensor? loss) Forward(Tensor idx, Tensor? targets = null)
     {
         Tensor logits = _embedding.forward(idx); // (B,T,C)
         Tensor? loss = null;
 
-        if (!ReferenceEquals(targets, null))
+        if (targets is not null)
         {
             var (B, T, C) = (logits.size(0), logits.size(1), logits.size(2));
             logits = logits.view(B * T, C);
@@ -119,16 +124,16 @@ public sealed class BigramLanguageModel : torch.nn.Module
         return (logits, loss);
     }
 
-    public Tensor Generate(Tensor idx, int maxNewTokens)
+    public IEnumerable<short> Generate(Tensor idx, int maxNewTokens)
     {
         for (int i = 0; i < maxNewTokens; i++)
         {
-            var (logits, _) = Forward(idx);
+            (Tensor logits, _) = Forward(idx);
             logits = logits.select(1, -1);
-            var probs = functional.softmax(logits, -1);
+            Tensor probs = functional.softmax(logits, -1);
             Tensor idxNext = torch.multinomial(probs, 1);
             idx = torch.cat(new[] { idx, idxNext }, 1);
+            yield return (short)idxNext.item<long>();
         }
-        return idx;
     }
 }

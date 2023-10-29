@@ -6,6 +6,8 @@ using Tensor = TorchSharp.torch.Tensor;
 // ReSharper disable SuggestVarOrType_SimpleTypes
 // ReSharper disable SuggestVarOrType_Elsewhere
 // ReSharper disable InvalidXmlDocComment
+// ReSharper disable All
+#pragma warning disable IDE0059
 
 namespace Gpt;
 
@@ -31,7 +33,7 @@ public static class Program
     {
         // Check if CUDA (GPU) is available, else default to CPU
         // You will need a good GPU to train this model
-        Settings.Device = torch.cuda.is_available() ? torch.CPU : torch.CPU; // CHANGE TO CUDA IF YOU HAVE A GOOD GPU
+        Settings.Device = torch.cuda.is_available() ? torch.CPU : torch.CPU; // Change to CUDA if you have good gpu and install CUDA driver in shared csproj by uncommenting
         if (Settings.Device.type == DeviceType.CUDA)
         {
             torch.InitializeDeviceType(DeviceType.CUDA);
@@ -124,6 +126,10 @@ public static class Program
             optimizer.zero_grad();
 
             // Backpropagate the error: Compute gradients of the loss with respect to model parameters.
+            // This will affect the weights and biases in every tensor in the computation graph leading
+            // to the calculation of loss, which is everything because we just did a forward pass of the
+            // whole model. All the embedding tables, linear layers, layer norms, etc. in all the modules
+            // and sub-modules will be updated.
             loss?.backward();
 
             // Update the model's weights based on computed gradients.
@@ -135,6 +141,7 @@ public static class Program
         {
             Console.Write(tokenEncoder.Decode(token));
         }
+
         model.save(Settings.SaveLocation);
         Console.WriteLine("Complete");
     }
@@ -153,13 +160,13 @@ public static class Program
         {
             model.load(Settings.SaveLocation);
         }
-        model.train();
+        model.eval();
         Tensor context = torch.zeros(new long[] { 1, 1 }, dtype: torch.ScalarType.Int64).to(Settings.Device);
         foreach (var token in model.Generate(context, maxNewTokens: 100000))
         {
             Console.Write(tokenEncoder.Decode(token));
         }
-        Console.WriteLine("Complete");
+        Console.WriteLine("\n\n--Complete--");
     }
 
     private static float[] EstimateLoss(GptLanguageModel model, DataSampler dataSampler)
@@ -509,7 +516,7 @@ public sealed class GptLanguageModel : torch.nn.Module
 
         // If targets are provided, reshape the logits and compute the cross-entropy loss
         Tensor? loss = null;
-        if (!ReferenceEquals(targets, null))
+        if (targets is not null)
         {
             (long b2,long t2,long c2) = (logits.size(0), logits.size(1), logits.size(2));
             logits = logits.view(b2 * t2, c2);
@@ -522,17 +529,17 @@ public sealed class GptLanguageModel : torch.nn.Module
 
     public IEnumerable<short> Generate(Tensor allGeneratedTokens, int maxNewTokens)
     {
-        const int CONTEXT_WINDOW = 200;
+        const int contextWindow = 200;
 
         for (int i = 0; i < maxNewTokens; i++)
         {
-            long start = Math.Max(0, allGeneratedTokens.size(1) - CONTEXT_WINDOW); // Gets the first token 
+            long start = Math.Max(0, allGeneratedTokens.size(1) - contextWindow); // Gets the first token 
 
             // Extract the relevant section of the tensor for the current context
             Tensor idxCond = allGeneratedTokens.narrow(1, start, allGeneratedTokens.size(1) - start);
 
             // Compute the logits for the selected context
-            var (logits, loss) = Forward(idxCond);
+            (Tensor logits, _) = Forward(idxCond);
 
             // Extract the logits corresponding to the last token
             logits = logits.select(1, -1);
