@@ -1,4 +1,5 @@
 ﻿using Shared;
+using System.Diagnostics;
 using TorchSharp;
 using TorchSharp.Modules;
 using Tensor = TorchSharp.torch.Tensor;
@@ -11,6 +12,8 @@ using Tensor = TorchSharp.torch.Tensor;
 
 namespace Gpt;
 
+// Exact settings from video, will likely cause your GPU to run out of 
+// memory if you try with CUDA
 internal static class Settings
 {
     public static Mode Mode { get; set; } = Mode.Generate;
@@ -32,7 +35,7 @@ public static class Program
     private static void Main(string[] args)
     {
         // Check if CUDA (GPU) is available, else default to CPU
-        // You will need a good GPU to train this model
+        // You will need a good GPU to train this model, not all of us have A100s
         Settings.Device = torch.cuda.is_available() ? torch.CPU : torch.CPU; // Change to CUDA if you have good gpu and install CUDA driver in shared csproj by uncommenting
         if (Settings.Device.type == DeviceType.CUDA)
         {
@@ -94,10 +97,16 @@ public static class Program
         var parameterCount = model.parameters().Sum(p => p.numel());
         Console.WriteLine($"Parameters Count: {parameterCount}");
 
+        // just to track the average length of an iteration
+        Stopwatch stopwatch = new Stopwatch();
+        double totalTime = 0.0;
+        int validIterations = 0;
+
         float[] lowestEval = new [] { float.MaxValue, float.MaxValue };
         int patienceCounter = 0;
         for (int i = 0; i < Settings.MaxIterations; i++)
         {
+            stopwatch.Restart();
             if (i % Settings.EvalInterval == 0)
             {
                 float[] losses = EstimateLoss(model, dataSampler);
@@ -137,6 +146,14 @@ public static class Program
 
             // Update the model's weights based on computed gradients.
             optimizer.step();
+
+            stopwatch.Stop();
+            if (stopwatch.Elapsed.TotalSeconds < 1)
+            {
+                totalTime += stopwatch.Elapsed.TotalSeconds;
+                validIterations++;
+            }
+            Console.WriteLine($"step {i}: average iteration time: {(totalTime / validIterations):F4}");
         }
 
         // Timestamp: 32:15
@@ -544,6 +561,7 @@ public sealed class GptLanguageModel : torch.nn.Module
 
     public IEnumerable<short> Generate(Tensor allGeneratedTokens, int maxNewTokens)
     {
+        // in video max new tokens was the context window but that was slowing things down a lot for me
         const int contextWindow = 200;
 
         for (int i = 0; i < maxNewTokens; i++)
