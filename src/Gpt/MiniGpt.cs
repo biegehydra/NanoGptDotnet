@@ -87,6 +87,8 @@ public static class Program
         {
             model.load(Settings.SaveLocation);
         }
+
+        // Timestamp: 35:15
         AdamW optimizer = torch.optim.AdamW(model.parameters(), lr: Settings.LearningRate);
 
         var parameterCount = model.parameters().Sum(p => p.numel());
@@ -102,6 +104,7 @@ public static class Program
                 Console.WriteLine($"step {i}: train loss {losses[0]:F4}, val loss {losses[1]:F4}");
                 if (losses[0] < lowestEval[0] && losses[1] < lowestEval[1])
                 {
+                    lowestEval = losses;
                     model.save(Settings.SaveLocation);
                     patienceCounter = 0;
                 }
@@ -136,6 +139,7 @@ public static class Program
             optimizer.step();
         }
 
+        // Timestamp: 32:15
         var context = torch.zeros(new long[] { 1, 1 }, dtype: torch.ScalarType.Int64).to(Settings.Device);
         foreach (var token in model.Generate(context, maxNewTokens: 200))
         {
@@ -161,6 +165,8 @@ public static class Program
             model.load(Settings.SaveLocation);
         }
         model.eval();
+
+        // Timestamp: 32:15
         Tensor context = torch.zeros(new long[] { 1, 1 }, dtype: torch.ScalarType.Int64).to(Settings.Device);
         foreach (var token in model.Generate(context, maxNewTokens: 100000))
         {
@@ -169,8 +175,10 @@ public static class Program
         Console.WriteLine("\n\n--Complete--");
     }
 
+    // Timestamp: 40:00
     private static float[] EstimateLoss(GptLanguageModel model, DataSampler dataSampler)
     {
+        using var noGrad = torch.no_grad();
         var dataTypes = Enum.GetValues<DataType>();
         float[] results = new float[dataTypes.Length];
         model.eval();
@@ -194,6 +202,7 @@ public static class Program
 /// Represents a single attention head in the multi-head attention mechanism from the "Attention is All You Need" paper.
 /// It's responsible for calculating self-attention for a given segment of the input features.
 /// </summary>
+///  Notes about attention - Timestamp: 1:11:15
 public sealed class Head : torch.nn.Module
 {
     // Linear transformations to project the input tensor into key, query, and value representations.
@@ -250,6 +259,7 @@ public sealed class Head : torch.nn.Module
         // Calculate attention scores based on the dot product of queries and keys. 
         // The scaling factor (k.size(-1))^(-0.5) ensures stability in large dimensions.
         // (B, T, headSize) @ (B, headSize, T) -> (B, T, T)
+        // Timestamp: 56:30
         Tensor wei = q.matmul(k.transpose(-2, -1)) * Math.Pow(k.size(-1), -0.5);
 
         // Using the triangular mask to zero out positions so each character only attends to previous characters (and itself).
@@ -279,6 +289,7 @@ public sealed class Head : torch.nn.Module
 /// and aggregating the results, allowing the model to pay attention to different positions at the same time.
 /// This class consists of multiple 'Head's and aggregates their outputs, followed by a linear projection.
 /// </summary>
+/// Timestamp: 1:22:20
 public sealed class MultiHeadAttention : torch.nn.Module
 {
     // List of attention heads. Each head operates on the same input independently and produces its own output.
@@ -340,6 +351,7 @@ public sealed class MultiHeadAttention : torch.nn.Module
 /// It consists of two linear transformations with a ReLU activation in between.
 /// This network is applied to each position separately and identically, meaning it doesn't depend on other positions in the sequence.
 /// </summary>
+/// Timestamp: 1:25:00
 public sealed class FeedForward : torch.nn.Module
 {
     // The sequential container representing the position-wise feed-forward network.
@@ -376,6 +388,7 @@ public sealed class FeedForward : torch.nn.Module
 /// These mechanisms are complemented by residual connections and layer normalization stages.
 /// Multiple such blocks are stacked to form the complete Transformer encoder or decoder.
 /// </summary>
+/// Timestamp: 1:26:30
 public sealed class Block : torch.nn.Module
 {
     private readonly MultiHeadAttention _sa;
@@ -494,13 +507,15 @@ public sealed class GptLanguageModel : torch.nn.Module
         (long b1,long t1) = (idx.size(0), idx.size(1));
 
         // Convert token indices into token embeddings
-        Tensor tokEmb = _tokenEmbeddingTable.forward(idx);
+        // Timestamp: 59:00
+        Tensor tokEmb = _tokenEmbeddingTable.forward(idx); // (B,T,C)
 
         // Generate position embeddings
-        Tensor posEmb = _positionEmbeddingTable.forward(torch.arange(t1, device: idx.device));
+        Tensor posEmb = _positionEmbeddingTable.forward(torch.arange(t1, device: idx.device)); // (T,C)
 
         // Combine token and position embeddings
-        Tensor x = tokEmb + posEmb;
+        // Timestamp: 1:01:15
+        Tensor x = tokEmb + posEmb; // (B,T,C) holds not just the token embeddings but also the positional embeddings
 
         // Pass the combined embeddings through each transformer block
         foreach (var block in _blocksList)

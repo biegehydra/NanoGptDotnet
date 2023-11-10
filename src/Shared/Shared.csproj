@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="TorchSharp" Version="0.100.7" />
-    <PackageReference Include="TorchSharp-cpu" Version="0.100.7" />
+    <PackageReference Include="TorchSharp-cpu" Version="0.100.7" /> <!-- Comment out the cpu package if you switch to cuda -->
     <!--<PackageReference Include="TorchSharp-cuda-windows" Version="0.100.7" />-->
   </ItemGroup>
 

@@ -42,6 +42,8 @@ Console.WriteLine(numberToTest);
 
 DataSampler dataSampler = new DataSampler(trainData, testData);
 BigramLanguageModel model = new BigramLanguageModel("My_Language_Model", vocabSize).to(device);
+
+// Timestamp: 35:15
 AdamW optimizer = torch.optim.AdamW(model.parameters(), lr: Consts.LearningRate);
 
 for (int i = 0; i < Consts.MaxIterations; i++)
@@ -56,10 +58,12 @@ for (int i = 0; i < Consts.MaxIterations; i++)
 
     (Tensor logits, Tensor? loss) = model.Forward(inputs, targets);
     optimizer.zero_grad();
+
+    // Timestamp: 35:45
     loss?.backward();
     optimizer.step();
 }
-
+// Timestamp: 32:15
 Tensor context = torch.zeros(new long[] { 1, 1 }, dtype: torch.ScalarType.Int64, device: device);
 foreach (var token in model.Generate(context, maxNewTokens: 500))
 {
@@ -69,8 +73,10 @@ Console.WriteLine("\n\n--Complete--");
 
 return;
 
+// Timestamp: 40:00
 static float[] EstimateLoss(BigramLanguageModel model, DataSampler dataSampler, Device device)
 {
+    using var noGrad = torch.no_grad();
     var dataTypes = Enum.GetValues<DataType>();
     float[] results = new float[dataTypes.Length];
     model.eval();
@@ -85,6 +91,7 @@ static float[] EstimateLoss(BigramLanguageModel model, DataSampler dataSampler, 
         }
         results[(int)dataType] = losses.mean().item<float>();
     }
+    model.train();
     return results;
 }
 
@@ -104,6 +111,7 @@ public sealed class BigramLanguageModel : torch.nn.Module
 
     public BigramLanguageModel(string name, long vocabSize) : base(name)
     {
+        // Embedding explanation - Timestamp: 23:00
         _embedding = torch.nn.Embedding(vocabSize, vocabSize);
         register_module("token_embedding_table", _embedding);
     }
@@ -116,22 +124,30 @@ public sealed class BigramLanguageModel : torch.nn.Module
         if (targets is not null)
         {
             var (B, T, C) = (logits.size(0), logits.size(1), logits.size(2));
+
+            // Timestamp: 26:20
             logits = logits.view(B * T, C);
             targets = targets.view(B * T);
-            loss = functional.cross_entropy(logits, targets);
+            loss = functional.cross_entropy(logits, targets); // cross_entropy expects channel as second dimension
         }
 
         return (logits, loss);
     }
 
+    // Timestamp: 29:15
     public IEnumerable<short> Generate(Tensor idx, int maxNewTokens)
     {
         for (int i = 0; i < maxNewTokens; i++)
         {
+            // get predictions
             (Tensor logits, _) = Forward(idx);
+            // focus only on the last time step
             logits = logits.select(1, -1);
+            // apply softmax to get probabilities
             Tensor probs = functional.softmax(logits, -1);
+            // get next token from the probabilities
             Tensor idxNext = torch.multinomial(probs, 1);
+            // append new token to running sequence of tokens 
             idx = torch.cat(new[] { idx, idxNext }, 1);
             yield return (short)idxNext.item<long>();
         }

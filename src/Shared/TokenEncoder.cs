@@ -5,7 +5,7 @@ public class TokenEncoder
     private readonly Dictionary<char, short> _encoder;
     private readonly Dictionary<short, char> _decoder;
 
-
+    // Timestamp: 10:00
     public TokenEncoder(char[] chars)
     {
         _encoder = new Dictionary<char, short>();

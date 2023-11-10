@@ -6,6 +6,8 @@ public class DataSampler
 {
     private readonly torch.Tensor _trainData;
     private readonly torch.Tensor _testData;
+
+    // Timestamp: 19:00
     public DataSampler(torch.Tensor trainData, torch.Tensor testData)
     {
         _trainData = trainData;
