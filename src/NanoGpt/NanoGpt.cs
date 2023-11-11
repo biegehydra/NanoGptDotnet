@@ -39,7 +39,6 @@ public static class Program
 {
     private static void Main(string[] args)
     {
-        // Check if CUDA (GPU) is available, else default to CPU
         // You will need a good GPU to train this model, not all of us have A100s
         Settings.Device = torch.cuda.is_available() ? torch.CPU : torch.CPU; // Change to CUDA if you have good gpu and install CUDA driver in shared csproj by uncommenting
         if (Settings.Device.type == DeviceType.CUDA)
