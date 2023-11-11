@@ -147,6 +147,7 @@ public static class Program
             // to the calculation of loss, which is everything because we just did a forward pass of the
             // whole model. All the embedding tables, linear layers, layer norms, etc. in all the modules
             // and sub-modules will be updated.
+            // Gradients are computed using derivates and chain rule.
             loss?.backward();
 
             // Update the model's weights based on computed gradients.
@@ -245,7 +246,7 @@ public sealed class Head : torch.nn.Module
         // _value These are what you get after asking (querying) with the Q and matching with the K.
         // Think of them as the content of the items you're looking up by their labels
 
-        // As the LLM runs, it the weights for each of these layers change to represent the context of the words in the sequence.
+        // As the LLM runs, the weights for each of these layers change to represent the context of the words in the sequence.
 
         // Linear transformation to produce the "key" tensor from the input.
         _key = torch.nn.Linear(nEmb, headSize, false);
@@ -333,7 +334,7 @@ public sealed class MultiHeadAttention : torch.nn.Module
         for (int i = 0; i < numHeads; i++)
         {
             // Each head will have its own set of parameters (key, query, value transformations).
-            _heads.Add(new Head($"head_{i}", headSize, nEmb, nEmb, dropoutValue)); // Assuming the same nEmb for block size
+            _heads.Add(new Head($"head_{i}", headSize, nEmb, nEmb, dropoutValue)); 
         }
         register_module("heads", _heads);
 
