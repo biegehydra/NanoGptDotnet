@@ -9,6 +9,10 @@ using Device = TorchSharp.torch.Device;
 // ReSharper disable SuggestVarOrType_Elsewhere
 // ReSharper disable InvalidXmlDocComment
 
+// Translated from python code written by Andrej Karpathy https://www.youtube.com/watch?v=kCc8FmEb1nY
+// Comments are a mix of my comments, comments from the video, and GPT-4
+// Timestamps of video in comments
+
 Device device = torch.cuda.is_available() ? torch.CPU : torch.CPU; // Change to CUDA if you have good gpu and install CUDA driver in shared csproj by uncommenting
 if (device.type == DeviceType.CUDA)
 {

@@ -12,12 +12,17 @@ using Tensor = TorchSharp.torch.Tensor;
 
 namespace Gpt;
 
+// Translated from python code written by Andrej Karpathy https://www.youtube.com/watch?v=kCc8FmEb1nY
+// Comments are a mix of my comments, comments from the video, and GPT-4
+// Timestamps of video in comments
+
 // Exact settings from video, will likely cause your GPU to run out of 
 // memory if you try with CUDA
 internal static class Settings
 {
-    public static Mode Mode { get; set; } = Mode.Generate;
-    public static string SaveLocation => $"C:\\Models\\ChatGptYT_{Device.type}.dat";
+    public static Mode Mode { get; set; } = Mode.Train;
+    public static string SaveLocation => $"C:\\Models\\NanoGpt_{SettingsKey}.dat";
+    public static string SettingsKey => $"{Device.type}{NEmbed}{NHead}{NLayer}";
     public static int MaxIterations { get; set; } = 20000;
     public static int EvalInterval { get; set; } = 750;
     public static int EvalIterations { get; set; } = 200;
@@ -106,8 +111,7 @@ public static class Program
         int patienceCounter = 0;
         for (int i = 0; i < Settings.MaxIterations; i++)
         {
-            stopwatch.Restart();
-            if (i % Settings.EvalInterval == 0)
+            if (i != 0 && i % Settings.EvalInterval == 0)
             {
                 float[] losses = EstimateLoss(model, dataSampler);
                 Console.WriteLine($"step {i}: train loss {losses[0]:F4}, val loss {losses[1]:F4}");
@@ -127,6 +131,7 @@ public static class Program
                     patienceCounter = 0;
                 }
             }
+            stopwatch.Restart();
 
             (Tensor inputs, Tensor targets) = dataSampler.RandomSample(DataType.Train, Settings.BatchSize, Settings.BlockSize, Settings.Device);
 
@@ -148,7 +153,7 @@ public static class Program
             optimizer.step();
 
             stopwatch.Stop();
-            if (stopwatch.Elapsed.TotalSeconds < 1)
+            if (stopwatch.Elapsed.TotalSeconds < 30)
             {
                 totalTime += stopwatch.Elapsed.TotalSeconds;
                 validIterations++;
@@ -164,7 +169,7 @@ public static class Program
         }
 
         model.save(Settings.SaveLocation);
-        Console.WriteLine("Complete");
+        Console.WriteLine("\n\n--Complete--");
     }
 
     private static void Generate()
