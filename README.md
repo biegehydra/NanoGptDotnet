@@ -49,7 +49,7 @@ As'de asinge f seenthoured arisout cer
 Har s, ro h, t mend Mexy aran spo
 ```
 
-### MiniGpt
+### NanoGpt
 I was able to achieve similar results to Kaparthy. I had to use my CPU which took half a day to run. I got down to a training loss of around 0.67 and a validation loss of around 1.5. I'm not sure why my train loss and validation loss had a large spread than Kaparthy. Here's an example output of that model.
 
 ```
