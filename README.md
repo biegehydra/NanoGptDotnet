@@ -7,6 +7,10 @@ The project is currently setup to run on a CPU. To run on CUDA go to [Shared.csp
 
 Feel free to change comments, add comments, or fix the code in the master branch if there are bugs. If you'd like to improve the model with techniques not used in the video, create a seperate branch for that.
 
+### Debugging
+
+The built in `.ToString()` method is not good for tensors, so if your trying to print a tensor while debugging, I recommend using extension method `.ToFormattedString()` that I wrote.
+
 ### Bigram Model
 
 I was able to achieve the same, maybe slightly better results with the BigramModel. A loss of around 2.365 compared to Kaparthys 2.48.
