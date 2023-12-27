@@ -181,6 +181,9 @@ public static class Program
                 // to take 2 steps forwards.
                 else if (patienceCounter < 4)
                 {
+                    // Give the model some time for exploration.
+                    // Sometimes models need to increase loss before
+                    // they can reach new lows
                     patienceCounter++;
                 }
                 // If the model still hasn't improved, revert to the previous best model.
