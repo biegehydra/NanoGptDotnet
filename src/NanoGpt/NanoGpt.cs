@@ -122,6 +122,9 @@ public static class Program
                 }
                 else if (patienceCounter < 4)
                 {
+                    // Give the model some time for exploration.
+                    // Sometimes models need to increase loss before
+                    // they can reach new lows
                     patienceCounter++;
                 }
                 else
