@@ -27,7 +27,8 @@ internal static class Settings
     public static string SaveLocation => $"C:\\Models\\NanoGpt_{SettingsKey}.dat";
     public static string SettingsKey => $"{Device.type}{NEmbed}{NHead}{NLayer}";
     /// <summary>
-    /// Max number of times the models weights will be updated 
+    /// Max number of times the models weights will be updated.
+    /// Also how many forward passes of the model to perform.
     /// </summary>
     public static int MaxIterations { get; set; } = 20000;
     /// <summary>
@@ -165,7 +166,7 @@ public static class Program
             // This is done periodically and not at every single training step to save compute time.
             if (i != 0 && i % Settings.EvalInterval == 0)
             {
-                // Calculate the loss for train data and test data
+                // Calculate the loss on the training data set and test data set
                 float[] losses = EstimateLoss(model, dataSampler);
                 Console.WriteLine($"step {i}: train loss {losses[0]:F4}, val loss {losses[1]:F4}");
 
@@ -181,9 +182,6 @@ public static class Program
                 // to take 2 steps forwards.
                 else if (patienceCounter < 4)
                 {
-                    // Give the model some time for exploration.
-                    // Sometimes models need to increase loss before
-                    // they can reach new lows
                     patienceCounter++;
                 }
                 // If the model still hasn't improved, revert to the previous best model.
