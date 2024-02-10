@@ -58,7 +58,7 @@ for (int i = 0; i < Consts.MaxIterations; i++)
         Console.WriteLine($"step {i}: train loss {losses[0]:F4}, val loss {losses[1]:F4}");
     }
 
-    (Tensor inputs, Tensor targets) = dataSampler.RandomSample(DataType.Train, Consts.BatchSize, Consts.BlockSize, device);
+    (Tensor inputs, Tensor targets) = dataSampler.RandomSamples(DataType.Train, Consts.BatchSize, Consts.BlockSize, device);
 
     (Tensor logits, Tensor? loss) = model.Forward(inputs, targets);
     optimizer.zero_grad();
@@ -89,7 +89,7 @@ static float[] EstimateLoss(BigramLanguageModel model, DataSampler dataSampler, 
         var losses = torch.zeros(Consts.EvalIterations);
         for (int k = 0; k < Consts.EvalIterations - 1; k++)
         {
-            var (inputs, targets) = dataSampler.RandomSample(dataType, Consts.BatchSize, Consts.BlockSize, device);
+            var (inputs, targets) = dataSampler.RandomSamples(dataType, Consts.BatchSize, Consts.BlockSize, device);
             var (logits, loss) = model.Forward(inputs, targets);
             losses[k] = loss!.item<float>();
         }

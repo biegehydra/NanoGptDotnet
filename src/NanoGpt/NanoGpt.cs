@@ -20,19 +20,69 @@ namespace Gpt;
 // memory if you try with CUDA
 internal static class Settings
 {
+    /// <summary>
+    /// Controls whether to train the model or go straight to generating
+    /// </summary>
     public static Mode Mode { get; set; } = Mode.Train;
     public static string SaveLocation => $"C:\\Models\\NanoGpt_{SettingsKey}.dat";
     public static string SettingsKey => $"{Device.type}{NEmbed}{NHead}{NLayer}";
+    /// <summary>
+    /// Max number of times the models weights will be updated 
+    /// </summary>
     public static int MaxIterations { get; set; } = 20000;
+    /// <summary>
+    /// Controls how often to evaluate the model
+    /// </summary>
     public static int EvalInterval { get; set; } = 750;
+    /// <summary>
+    /// Controls how many times to calculate the loss when evaluating the model.
+    /// More eval iterations gives a more accurate estimate of the models performance.
+    /// </summary>
     public static int EvalIterations { get; set; } = 200;
+    /// <summary>
+    /// Controls where the tensors live
+    /// </summary>
     public static torch.Device Device = null!;
+    /// <summary>
+    /// The number of samples processed in one iteration of model training.
+    /// A larger batch size requires more memory but can lead to faster convergence.
+    /// </summary>
     public const int BatchSize = 64;
+    /// <summary>
+    /// The number of tokens in each batch.
+    /// Higher block size increases memory usage.
+    /// </summary>
     public const int BlockSize = 256;
+    /// <summary>
+    /// The learning rate for the optimizer.
+    /// This controls the size of the updates to the model's weights during training.
+    /// </summary>
     public const double LearningRate = 3e-4;
+    /// <summary>
+    /// The dropout rate applied to layers during training to prevent overfitting.
+    /// Dropout randomly sets input units to 0 at each update during training time,
+    /// which helps to regularize the model.
+    /// </summary>
     public const double DropoutValue = 0.2;
+    /// <summary>
+    /// The size of the embedding layer.
+    /// This represents the size of the vectors used to
+    /// encode the tokens into continuous vectors before
+    /// feeding them into the model.
+    /// </summary>
     public const int NEmbed = 384;
+    /// <summary>
+    /// The number of attention heads in the transformer model.
+    /// Multiple heads allow the model to jointly attend to characters
+    /// at different positions in the input.
+    /// </summary>
     public const int NHead = 6;
+    /// <summary>
+    /// The number of transformer layers in the model.
+    /// Each layer consists of a multi-head attention mechanism
+    /// followed by a feed-forward network.
+    /// More layers can increase the model's capacity to learn complex patterns.
+    /// </summary>
     public const int NLayer = 6;
 }
 public static class Program
@@ -82,6 +132,7 @@ public static class Program
         long numberToTest = data.shape[0] - numberToTrain;
 
         // Split the data into training and testing
+        // 90% for training, 10% for testing
         Tensor trainData = data[..(int)numberToTrain];
         Tensor testData = data[(int)numberToTrain..];
 
@@ -110,20 +161,29 @@ public static class Program
         int patienceCounter = 0;
         for (int i = 0; i < Settings.MaxIterations; i++)
         {
+            // Check if it's time to evaluate the model based on the evaluation interval setting.
+            // This is done periodically and not at every single training step to save compute time.
             if (i != 0 && i % Settings.EvalInterval == 0)
             {
+                // Calculate the loss for train data and test data
                 float[] losses = EstimateLoss(model, dataSampler);
                 Console.WriteLine($"step {i}: train loss {losses[0]:F4}, val loss {losses[1]:F4}");
+
+                // If the current losses are the lowest observed, update the best model checkpoint.
                 if (losses[0] < lowestEval[0] && losses[1] < lowestEval[1])
                 {
                     lowestEval = losses;
                     model.save(Settings.SaveLocation);
                     patienceCounter = 0;
                 }
+                // Allow the model some leeway so it can explore different
+                // pathways. Sometimes you have to take 1 step backwards
+                // to take 2 steps forwards.
                 else if (patienceCounter < 4)
                 {
                     patienceCounter++;
                 }
+                // If the model still hasn't improved, revert to the previous best model.
                 else
                 {
                     model.load(Settings.SaveLocation);
@@ -132,7 +192,12 @@ public static class Program
             }
             stopwatch.Restart();
 
-            (Tensor inputs, Tensor targets) = dataSampler.RandomSample(DataType.Train, Settings.BatchSize, Settings.BlockSize, Settings.Device);
+            // Get random input blocks from the train data
+            // with their respective targets. Targets
+            // are just the input tensors offset by 1 index
+            // to the right, they represent what
+            // is supposed to come next.
+            (Tensor inputs, Tensor targets) = dataSampler.RandomSamples(DataType.Train, Settings.BatchSize, Settings.BlockSize, Settings.Device);
 
             // Pass the 'inputs' through the GPT model to obtain predictions ('logits') and calculate the loss with respect to 'targets'.
             // The 'logits' tensor contains raw prediction values for each token in the vocabulary, while 'loss' represents the model's error.
@@ -197,6 +262,12 @@ public static class Program
         Console.WriteLine("\n\n--Complete--");
     }
 
+
+    /// <summary>
+    /// Estimates the loss of a GPT language model across different data types (Train, Test).
+    /// This function is used to evaluate the model's performance by calculating the average loss over a set number of iterations.
+    /// Gradient computation is temporarily disabled to optimize memory usage and computation time during this evaluation phase.
+    /// </summary>
     // Timestamp: 40:00
     private static float[] EstimateLoss(GptLanguageModel model, DataSampler dataSampler)
     {
@@ -209,7 +280,7 @@ public static class Program
             var losses = torch.zeros(Settings.EvalIterations);
             for (int k = 0; k < Settings.EvalIterations - 1; k++)
             {
-                (Tensor inputs, Tensor targets) = dataSampler.RandomSample(dataType, Settings.BatchSize, Settings.BlockSize, Settings.Device);
+                (Tensor inputs, Tensor targets) = dataSampler.RandomSamples(dataType, Settings.BatchSize, Settings.BlockSize, Settings.Device);
                 (Tensor logits, Tensor? loss) = model.Forward(inputs, targets);
                 losses[k] = loss!.item<float>();
             }
@@ -270,7 +341,7 @@ public sealed class Head : torch.nn.Module
 
     public Tensor Forward(Tensor x)
     {
-        // Extracting dimensions: B is batch size, T is sequence length, and C is feature/channel count
+        // B is batch size, T is sequence length, and C is feature/channel count
         (long B, long T, long C) = (x.size(0), x.size(1), x.size(2));
 
         // Obtain the key and query representations of the input tensor based on the current weights
