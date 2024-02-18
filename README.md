@@ -1,4 +1,5 @@
 ## NanoGptDotnet
+Translated from python code written by Andrej Karpathy https://www.youtube.com/watch?v=kCc8FmEb1nY
 
 ### Running on CUDA
 The project is currently setup to run on a CPU. To run on CUDA go to [Shared.csporj](https://github.com/biegehydra/NanoGptDotnet/blob/master/src/Shared/Shared.csproj) and uncomments the line for the CUDA package and delete the line for the cpu package.
