@@ -75,6 +75,11 @@ internal static class Settings
     /// </summary>
     public const int NHead = 6;
     /// <summary>
+    /// Size/dimension of each head's output. This ensures each head processes a segment of 
+    /// the embedding dimension
+    /// </summary>
+    public const int HeadSize = NEmbed / NHead;
+    /// <summary>
     /// The number of transformer layers in the model.
     /// Each layer consists of a multi-head attention mechanism
     /// followed by a feed-forward network.
@@ -300,7 +305,7 @@ public sealed class Head : torch.nn.Module
     private readonly Tensor _tril;
 
     /// <param name="headSize">Size/dimension of this head's output.</param>
-    public Head(string name, long headSize) : base(name)
+    public Head(string name) : base(name)
     {
         // _key represents the words or tokens in the input sequence.
         // _query represent what you're trying to find out.
@@ -310,15 +315,15 @@ public sealed class Head : torch.nn.Module
         // As the LLM runs, the weights for each of these layers change to represent the context of the words in the sequence.
 
         // Linear transformation to produce the "key" tensor from the input.
-        _key = torch.nn.Linear(Settings.NEmbed, headSize, hasBias: false);
+        _key = torch.nn.Linear(Settings.NEmbed, Settings.HeadSize, hasBias: false);
         register_module("key", _key);
 
         // Linear transformation to produce the "query" tensor from the input.
-        _query = torch.nn.Linear(Settings.NEmbed, headSize, hasBias: false);
+        _query = torch.nn.Linear(Settings.NEmbed, Settings.HeadSize, hasBias: false);
         register_module("query", _query);
 
         // Define linear transformation for values, without bias.
-        _value = torch.nn.Linear(Settings.NEmbed, headSize, hasBias: false);
+        _value = torch.nn.Linear(Settings.NEmbed, Settings.HeadSize, hasBias: false);
         register_module("value", _value);
 
         // Lower triangular mask to ensure causality in self-attention
@@ -385,18 +390,17 @@ public sealed class MultiHeadAttention : torch.nn.Module
     // Dropout layer for regularization, applied after the linear transformation.
     private readonly Dropout _dropout;
 
-    /// <param name="headSize">Size/dimension of each head's output.</param>
-    public MultiHeadAttention(string name, long headSize) : base(name)
+    public MultiHeadAttention(string name) : base(name)
     {
         _heads = new ModuleList<Head>();
         for (int i = 0; i < Settings.NHead; i++)
         {
             // Each head will have its own set of parameters (key, query, value transformations).
-            _heads.Add(new Head($"head_{i}", headSize)); 
+            _heads.Add(new Head($"head_{i}")); 
         }
         register_module("heads", _heads);
 
-        _proj = torch.nn.Linear(headSize * Settings.NHead, Settings.NEmbed);
+        _proj = torch.nn.Linear(Settings.HeadSize * Settings.NHead, Settings.NEmbed);
         register_module("proj", _proj);
 
         _dropout = torch.nn.Dropout(Settings.DropoutValue);
@@ -479,8 +483,7 @@ public sealed class Block : torch.nn.Module
     private readonly LayerNorm _ln2;
     public Block(string name) : base(name)
     {
-        long headSize = Settings.NEmbed / Settings.NHead;
-        _sa = new MultiHeadAttention($"sa_{name}", headSize); // replace `Settings.DropoutValue` with the appropriate dropout
+        _sa = new MultiHeadAttention($"sa_{name}"); // replace `Settings.DropoutValue` with the appropriate dropout
         register_module("sa", _sa);
 
         _ffwd = new FeedForward($"ffwd_{name}"); // replace `Settings.DropoutValue` with the appropriate dropout
