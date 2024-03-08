@@ -75,7 +75,7 @@ internal static class Settings
     /// </summary>
     public const int NHead = 6;
     /// <summary>
-    /// Size/dimension of each head's output. This ensures each head processes a segment of 
+    /// Size/dimension of each head's output. The division ensures each head processes a segment of 
     /// the embedding dimension
     /// </summary>
     public const int HeadSize = NEmbed / NHead;
