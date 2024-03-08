@@ -137,7 +137,7 @@ public static class Program
         Console.WriteLine(numberToTest);
 
         DataSampler dataSampler = new DataSampler(trainData, testData);
-        GptLanguageModel model = new GptLanguageModel("My_Language_Model", vocabSize, Settings.NEmbed, Settings.BlockSize, Settings.NLayer, Settings.NHead).to(Settings.Device);
+        GptLanguageModel model = new GptLanguageModel("My_Language_Model", vocabSize).to(Settings.Device);
         if (File.Exists(Settings.SaveLocation))
         {
             model.load(Settings.SaveLocation);
@@ -236,7 +236,7 @@ public static class Program
 
         TokenEncoder tokenEncoder = new TokenEncoder(chars);
 
-        GptLanguageModel model = new GptLanguageModel("My_Language_Model", vocabSize, Settings.NEmbed, Settings.BlockSize, Settings.NLayer, Settings.NHead).to(Settings.Device);
+        GptLanguageModel model = new GptLanguageModel("My_Language_Model", vocabSize).to(Settings.Device);
         if (File.Exists(Settings.SaveLocation))
         {
             model.load(Settings.SaveLocation);
@@ -299,7 +299,8 @@ public sealed class Head : torch.nn.Module
     // A mask to ensure the attention mechanism respects the order of words (i.e., a word cannot attend to future words).
     private readonly Tensor _tril;
 
-    public Head(string name, long headSize, long nEmb, long blockSize, double dropoutValue) : base(name)
+    /// <param name="headSize">Size/dimension of this head's output.</param>
+    public Head(string name, long headSize) : base(name)
     {
         // _key represents the words or tokens in the input sequence.
         // _query represent what you're trying to find out.
@@ -309,23 +310,23 @@ public sealed class Head : torch.nn.Module
         // As the LLM runs, the weights for each of these layers change to represent the context of the words in the sequence.
 
         // Linear transformation to produce the "key" tensor from the input.
-        _key = torch.nn.Linear(nEmb, headSize, false);
+        _key = torch.nn.Linear(Settings.NEmbed, headSize, hasBias: false);
         register_module("key", _key);
 
         // Linear transformation to produce the "query" tensor from the input.
-        _query = torch.nn.Linear(nEmb, headSize, false);
+        _query = torch.nn.Linear(Settings.NEmbed, headSize, hasBias: false);
         register_module("query", _query);
 
         // Define linear transformation for values, without bias.
-        _value = torch.nn.Linear(nEmb, headSize, false);
+        _value = torch.nn.Linear(Settings.NEmbed, headSize, hasBias: false);
         register_module("value", _value);
 
         // Lower triangular mask to ensure causality in self-attention
-        _tril = torch.tril(torch.ones(blockSize, blockSize));
+        _tril = torch.tril(torch.ones(Settings.BlockSize, Settings.BlockSize));
         register_buffer("tril", _tril);
 
         // Dropout layer for regularization.
-        _dropout = torch.nn.Dropout(dropoutValue);
+        _dropout = torch.nn.Dropout(Settings.DropoutValue);
         register_module("dropout", _dropout);
     }
 
@@ -384,29 +385,26 @@ public sealed class MultiHeadAttention : torch.nn.Module
     // Dropout layer for regularization, applied after the linear transformation.
     private readonly Dropout _dropout;
 
-    /// <param name="numHeads">Number of attention heads.</param>
     /// <param name="headSize">Size/dimension of each head's output.</param>
-    /// <param name="nEmb">Size/dimension of embeddings. Also the size of expected input tensor's last dimension.</param>
-    /// <param name="dropoutValue">Probability for the dropout layer. Represents fraction of inputs that will be zeroed out.</param>
-    public MultiHeadAttention(string name, long numHeads, long headSize, long nEmb, double dropoutValue) : base(name)
+    public MultiHeadAttention(string name, long headSize) : base(name)
     {
         _heads = new ModuleList<Head>();
-        for (int i = 0; i < numHeads; i++)
+        for (int i = 0; i < Settings.NHead; i++)
         {
             // Each head will have its own set of parameters (key, query, value transformations).
-            _heads.Add(new Head($"head_{i}", headSize, nEmb, nEmb, dropoutValue)); 
+            _heads.Add(new Head($"head_{i}", headSize)); 
         }
         register_module("heads", _heads);
 
-        _proj = torch.nn.Linear(headSize * numHeads, nEmb);
+        _proj = torch.nn.Linear(headSize * Settings.NHead, Settings.NEmbed);
         register_module("proj", _proj);
 
-        _dropout = torch.nn.Dropout(dropoutValue);
+        _dropout = torch.nn.Dropout(Settings.DropoutValue);
         register_module("dropout", _dropout);
     }
 
-    /// <param name="x">Input tensor of shape (batch_size, sequence_length, nEmb).</param>
-    /// <returns>Processed tensor of shape (batch_size, sequence_length, nEmb).</returns>
+    /// <param name="x">Input tensor of shape (batch_size, sequence_length, Settings.NEmbed).</param>
+    /// <returns>Processed tensor of shape (batch_size, sequence_length, Settings.NEmbed).</returns>
     public Tensor Forward(Tensor x)
     {
         List<Tensor> outputs = new List<Tensor>();
@@ -440,20 +438,17 @@ public sealed class FeedForward : torch.nn.Module
     // The sequential container representing the position-wise feed-forward network.
     private Sequential _net;
 
-    /// <param name="nEmb">Size/dimension of embeddings. This indicates both the input and output size of the FFN.</param>
-    /// <param name="dropoutValue">Represents the fraction of inputs that will be zeroed out in dropout layer.</param>
-    public FeedForward(string name, long nEmb, double dropoutValue) : base(name)
+    public FeedForward(string name) : base(name)
     {
-
-        // 1. Expanding the input to '4 * nEmb' dimensions.
+        // 1. Expanding the input to '4 * Settings.NEmbed' dimensions.
         // 2. Apply ReLU activation
-        // 3. Compress it back to 'nEmb' dimensions.
+        // 3. Compress it back to 'Settings.NEmbed' dimensions.
         // 4. Dropout layer.
         _net = torch.nn.Sequential(
-            ("linear1", torch.nn.Linear(nEmb, 4 * nEmb)),
+            ("linear1", torch.nn.Linear(Settings.NEmbed, 4 * Settings.NEmbed)),
             ("relu", torch.nn.ReLU()),
-            ("linear2", torch.nn.Linear(4 * nEmb, nEmb)),
-            ("dropout", torch.nn.Dropout(dropoutValue))
+            ("linear2", torch.nn.Linear(4 * Settings.NEmbed, Settings.NEmbed)),
+            ("dropout", torch.nn.Dropout(Settings.DropoutValue))
         );
         register_module("net", _net);
     }
@@ -482,23 +477,19 @@ public sealed class Block : torch.nn.Module
 
     // Layer normalization for the input to the feed-forward network.
     private readonly LayerNorm _ln2;
-
-
-    /// <param name="nEmb">Size/dimension of embeddings.</param>
-    /// <param name="nHead">Number of heads for the multi-head attention mechanism.</param>
-    public Block(string name, long nEmb, long nHead) : base(name)
+    public Block(string name) : base(name)
     {
-        long headSize = nEmb / nHead;
-        _sa = new MultiHeadAttention($"sa_{name}", nHead, headSize, nEmb, Settings.DropoutValue); // replace `dropoutValue` with the appropriate dropout
+        long headSize = Settings.NEmbed / Settings.NHead;
+        _sa = new MultiHeadAttention($"sa_{name}", headSize); // replace `Settings.DropoutValue` with the appropriate dropout
         register_module("sa", _sa);
 
-        _ffwd = new FeedForward($"ffwd_{name}", nEmb, Settings.DropoutValue); // replace `dropoutValue` with the appropriate dropout
+        _ffwd = new FeedForward($"ffwd_{name}"); // replace `Settings.DropoutValue` with the appropriate dropout
         register_module("ffwd", _ffwd);
 
-        _ln1 = torch.nn.LayerNorm(nEmb);
+        _ln1 = torch.nn.LayerNorm(Settings.NEmbed);
         register_module("ln1", _ln1);
 
-        _ln2 = torch.nn.LayerNorm(nEmb);
+        _ln2 = torch.nn.LayerNorm(Settings.NEmbed);
         register_module("ln2", _ln2);
     }
 
@@ -532,28 +523,28 @@ public sealed class GptLanguageModel : torch.nn.Module
     // List of transformer blocks (each containing multi-head attention and feed-forward network)
     private readonly List<Block> _blocksList;
 
-    public GptLanguageModel(string name, long vocabSize, long nEmb, long blockSize, long nLayer, long nHead) : base(name)
+    public GptLanguageModel(string name, long vocabSize) : base(name)
     {
         // Initialize token embeddings from the given vocabulary size and embedding dimension
-        _tokenEmbeddingTable = torch.nn.Embedding(vocabSize, nEmb);
+        _tokenEmbeddingTable = torch.nn.Embedding(vocabSize, Settings.NEmbed);
         register_module("token_embedding_table", _tokenEmbeddingTable);
 
         // Initialize position embeddings from the sequence length (block size) and embedding dimension
-        _positionEmbeddingTable = torch.nn.Embedding(blockSize, nEmb);
+        _positionEmbeddingTable = torch.nn.Embedding(Settings.BlockSize, Settings.NEmbed);
         register_module("position_embedding_table", _positionEmbeddingTable);
 
         _blocksList = new List<Block>();
-        for (int i = 0; i < nLayer; i++)
+        for (int i = 0; i < Settings.NLayer; i++)
         {
-            var block = new Block($"block_{i}", nEmb, nHead);
+            var block = new Block($"block_{i}");
             _blocksList.Add(block);
             register_module($"block_{i}", block);
         }
 
-        _lnF = torch.nn.LayerNorm(nEmb);
+        _lnF = torch.nn.LayerNorm(Settings.NEmbed);
         register_module("ln_f", _lnF);
 
-        _lmHead = torch.nn.Linear(nEmb, vocabSize);
+        _lmHead = torch.nn.Linear(Settings.NEmbed, vocabSize);
         register_module("lm_head", _lmHead);
 
         // Apply custom weight initialization method

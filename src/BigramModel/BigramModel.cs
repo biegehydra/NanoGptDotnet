@@ -48,17 +48,17 @@ DataSampler dataSampler = new DataSampler(trainData, testData);
 BigramLanguageModel model = new BigramLanguageModel("My_Language_Model", vocabSize).to(device);
 
 // Timestamp: 35:15
-AdamW optimizer = torch.optim.AdamW(model.parameters(), lr: Consts.LearningRate);
+AdamW optimizer = torch.optim.AdamW(model.parameters(), lr: Settings.LearningRate);
 
-for (int i = 0; i < Consts.MaxIterations; i++)
+for (int i = 0; i < Settings.MaxIterations; i++)
 {
-    if (i % Consts.EvalInterval == 0)
+    if (i % Settings.EvalInterval == 0)
     {
         float[] losses = EstimateLoss(model, dataSampler, device);
         Console.WriteLine($"step {i}: train loss {losses[0]:F4}, val loss {losses[1]:F4}");
     }
 
-    (Tensor inputs, Tensor targets) = dataSampler.RandomSamples(DataType.Train, Consts.BatchSize, Consts.BlockSize, device);
+    (Tensor inputs, Tensor targets) = dataSampler.RandomSamples(DataType.Train, Settings.BatchSize, Settings.BlockSize, device);
 
     (Tensor logits, Tensor? loss) = model.Forward(inputs, targets);
     optimizer.zero_grad();
@@ -86,10 +86,10 @@ static float[] EstimateLoss(BigramLanguageModel model, DataSampler dataSampler, 
     model.eval();
     foreach (var dataType in dataTypes)
     {
-        var losses = torch.zeros(Consts.EvalIterations);
-        for (int k = 0; k < Consts.EvalIterations - 1; k++)
+        var losses = torch.zeros(Settings.EvalIterations);
+        for (int k = 0; k < Settings.EvalIterations - 1; k++)
         {
-            var (inputs, targets) = dataSampler.RandomSamples(dataType, Consts.BatchSize, Consts.BlockSize, device);
+            var (inputs, targets) = dataSampler.RandomSamples(dataType, Settings.BatchSize, Settings.BlockSize, device);
             var (logits, loss) = model.Forward(inputs, targets);
             losses[k] = loss!.item<float>();
         }
@@ -99,7 +99,7 @@ static float[] EstimateLoss(BigramLanguageModel model, DataSampler dataSampler, 
     return results;
 }
 
-public static class Consts
+public static class Settings
 {
     public const int BatchSize = 32;
     public const int BlockSize = 8;
