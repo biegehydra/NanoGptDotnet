@@ -149,10 +149,8 @@ public static class Program
         var parameterCount = model.parameters().Sum(p => p.numel());
         Console.WriteLine($"Parameters Count: {parameterCount}");
 
-        // just to track the average length of an iteration
+        // just to time the length of an iteration
         Stopwatch stopwatch = new Stopwatch();
-        double totalTime = 0.0;
-        int validIterations = 0;
 
         float[] lowestEval = new [] { float.MaxValue, float.MaxValue };
         int patienceCounter = 0;
@@ -215,12 +213,7 @@ public static class Program
             optimizer.step();
 
             stopwatch.Stop();
-            if (stopwatch.Elapsed.TotalSeconds < 30)
-            {
-                totalTime += stopwatch.Elapsed.TotalSeconds;
-                validIterations++;
-            }
-            Console.WriteLine($"step {i}: average iteration time: {(totalTime / validIterations):F4}");
+            Console.WriteLine($"step {i}: iteration time milliseconds: {stopwatch.ElapsedMilliseconds:F0}");
         }
 
         // Timestamp: 32:15
