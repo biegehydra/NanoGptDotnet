@@ -3,10 +3,6 @@ using System.Diagnostics;
 using TorchSharp;
 using TorchSharp.Modules;
 using Tensor = TorchSharp.torch.Tensor;
-// ReSharper disable SuggestVarOrType_BuiltInTypes
-// ReSharper disable SuggestVarOrType_SimpleTypes
-// ReSharper disable SuggestVarOrType_Elsewhere
-// ReSharper disable InvalidXmlDocComment
 // ReSharper disable All
 #pragma warning disable IDE0059
 
@@ -166,7 +162,7 @@ public static class Program
             // This is done periodically and not at every single training step to save compute time.
             if (i != 0 && i % Settings.EvalInterval == 0)
             {
-                // Calculate the loss on the training data set and test data set
+                // Calculate the loss on the training and test data sets
                 float[] losses = EstimateLoss(model, dataSampler);
                 Console.WriteLine($"step {i}: train loss {losses[0]:F4}, val loss {losses[1]:F4}");
 
@@ -265,8 +261,8 @@ public static class Program
 
 
     /// <summary>
-    /// Estimates the loss of a GPT language model across different data types (Train, Test).
-    /// This function is used to evaluate the model's performance by calculating the average loss over a set number of iterations.
+    /// Estimates the loss of the model across different data types (Train, Test).
+    /// Used to evaluate the model's performance by calculating the average loss over a set number of iterations.
     /// Gradient computation is temporarily disabled to optimize memory usage and computation time during this evaluation phase.
     /// </summary>
     // Timestamp: 40:00
@@ -293,7 +289,7 @@ public static class Program
 }
 
 /// <summary>
-/// Represents a single attention head in the multi-head attention mechanism from the "Attention is All You Need" paper.
+/// Represents a single attention head in the multi-head attention mechanism.
 /// It's responsible for calculating self-attention for a given segment of the input features.
 /// </summary>
 ///  Notes about attention - Timestamp: 1:11:15
@@ -662,7 +658,7 @@ public sealed class GptLanguageModel : torch.nn.Module
 
             // Append the newly generated token to the context
             allGeneratedTokens = torch.cat(new[] { allGeneratedTokens, newlyGeneratedToken }, 1);
-            yield return (short)newlyGeneratedToken.item<long>();
+            yield return (short) newlyGeneratedToken.item<long>();
         }
     }
 }

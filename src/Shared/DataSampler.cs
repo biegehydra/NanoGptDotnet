@@ -29,7 +29,6 @@ public class DataSampler
         // start indexes for random blocks.
         // data.shape[0] - blockSize makes sure that room is left for the block
         torch.Tensor randTensor = torch.randint(0, data.shape[0] - blockSize, dimension);
-        Console.WriteLine(randTensor.ToFormattedString());
         List<torch.Tensor> inputs = new List<torch.Tensor>();
         List<torch.Tensor> targets = new List<torch.Tensor>();
 
