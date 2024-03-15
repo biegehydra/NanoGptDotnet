@@ -12,7 +12,7 @@ namespace Gpt;
 // Comments are a mix of my comments, comments from the video, and GPT-4
 // Timestamps of video in comments
 
-// Exact settings from video, will likely cause your GPU to run out of 
+// Exact settings from video in comments, will likely cause your GPU to run out of 
 // memory if you try with CUDA
 internal static class Settings
 {
@@ -20,8 +20,14 @@ internal static class Settings
     /// Controls whether to train the model or go straight to generating
     /// </summary>
     public static Mode Mode { get; set; } = Mode.Train;
-    public static string SaveLocation => $"C:\\Models\\NanoGpt_{SettingsKey}.dat";
-    public static string SettingsKey => $"{Device.type}{NEmbed}{NHead}{NLayer}";
+    public static string SaveLocation(int vocabSize) => $"C:\\Models\\NanoGpt_{SettingsKey}_{vocabSize}.dat";
+    public static string SettingsKey => $"{Device.type}_{NEmbed}_{NHead}_{NLayer}";
+
+    /// <summary>
+    /// Controls whether to generate tokens at each evaluations internal, in addition
+    /// to evaluating the loss.
+    /// </summary>
+    public static bool GenerateOnEvaluate { get; set; } = true;
     /// <summary>
     /// Max number of times the models weights will be updated.
     /// Also how many forward passes of the model to perform.
@@ -30,12 +36,12 @@ internal static class Settings
     /// <summary>
     /// Controls how often to evaluate the model
     /// </summary>
-    public static int EvalInterval { get; set; } = 750;
+    public static int EvalInterval { get; set; } = 250; // Video 750
     /// <summary>
     /// Controls how many times to calculate the loss when evaluating the model.
     /// More eval iterations gives a more accurate estimate of the models performance.
     /// </summary>
-    public static int EvalIterations { get; set; } = 200;
+    public static int EvalIterations { get; set; } = 100; // Video 200
     /// <summary>
     /// Controls where the tensors live
     /// </summary>
@@ -67,13 +73,13 @@ internal static class Settings
     /// encode the tokens into continuous vectors before
     /// feeding them into the model.
     /// </summary>
-    public const int NEmbed = 384;
+    public const int NEmbed = 384; 
     /// <summary>
     /// The number of attention heads in the transformer model.
     /// Multiple heads allow the model to jointly attend to characters
     /// at different positions in the input.
     /// </summary>
-    public const int NHead = 6;
+    public const int NHead = 6; 
     /// <summary>
     /// Size/dimension of each head's output. The division ensures each head processes a segment of 
     /// the embedding dimension
@@ -101,18 +107,6 @@ public static class Program
         // Set a manual seed for reproducibility
         torch.manual_seed(1337);
 
-        if (Settings.Mode == Mode.Train)
-        {
-            Train();
-        }
-        else
-        {
-            Generate();
-        }
-    }
-
-    private static void Train()
-    {
         string text = File.ReadAllText("input.txt");
 
         // Create a vocabulary from unique characters
@@ -125,6 +119,18 @@ public static class Program
         // Token encoder to convert characters to and from tokens/IDs
         TokenEncoder tokenEncoder = new TokenEncoder(chars);
 
+        if (Settings.Mode == Mode.Train)
+        {
+            Train(tokenEncoder, text, vocabSize);
+        }
+        else
+        {
+            Generate(tokenEncoder, vocabSize);
+        }
+    }
+
+    private static void Train(TokenEncoder tokenEncoder, string text, int vocabSize)
+    {
         List<short> encoded = tokenEncoder.Encode(text);
 
         // One dimensional tensor of all the encoded tokens [ 0, 32, 45,... ]
@@ -143,9 +149,9 @@ public static class Program
 
         DataSampler dataSampler = new DataSampler(trainData, testData);
         GptLanguageModel model = new GptLanguageModel("My_Language_Model", vocabSize).to(Settings.Device);
-        if (File.Exists(Settings.SaveLocation))
+        if (File.Exists(Settings.SaveLocation(vocabSize)))
         {
-            model.load(Settings.SaveLocation);
+            model.load(Settings.SaveLocation(vocabSize));
         }
 
         // Timestamp: 35:15
@@ -173,7 +179,12 @@ public static class Program
                 if (losses[0] < lowestEval[0] && losses[1] < lowestEval[1])
                 {
                     lowestEval = losses;
-                    model.save(Settings.SaveLocation);
+                    var directory = Path.GetDirectoryName(Settings.SaveLocation(vocabSize));
+                    if (!Directory.Exists(directory))
+                    {
+                        Directory.CreateDirectory(directory!);
+                    }
+                    model.save(Settings.SaveLocation(vocabSize));
                     patienceCounter = 0;
                 }
                 // Allow the model some leeway so it can explore different
@@ -186,8 +197,16 @@ public static class Program
                 // If the model still hasn't improved, revert to the previous best model.
                 else
                 {
-                    model.load(Settings.SaveLocation);
-                    patienceCounter = 0;
+                    if (File.Exists(Settings.SaveLocation(vocabSize)))
+                    {
+                        model.load(Settings.SaveLocation(vocabSize));
+                        patienceCounter = 0;
+                    }
+                }
+
+                if (Settings.GenerateOnEvaluate)
+                {
+                    model.GenerateAndPrint(tokenEncoder, maxNewTokens: 200);
                 }
             }
             stopwatch.Restart();
@@ -222,39 +241,18 @@ public static class Program
         }
 
         // Timestamp: 32:15
-        var context = torch.zeros(new long[] { 1, 1 }, dtype: torch.ScalarType.Int64).to(Settings.Device);
-        foreach (var token in model.Generate(context, maxNewTokens: 200))
-        {
-            Console.Write(tokenEncoder.Decode(token));
-        }
-
-        model.save(Settings.SaveLocation);
-        Console.WriteLine("\n\n--Complete--");
+        model.GenerateAndPrint(tokenEncoder, maxNewTokens: 500);
+        model.save(Settings.SaveLocation(vocabSize));
     }
 
-    private static void Generate()
+    private static void Generate(TokenEncoder tokenEncoder, int vocabSize)
     {
-        string text = File.ReadAllText("input.txt");
-        
-        char[] chars = text.Distinct().OrderBy(c => c).ToArray();
-        int vocabSize = chars.Length;
-
-        TokenEncoder tokenEncoder = new TokenEncoder(chars);
-
         GptLanguageModel model = new GptLanguageModel("My_Language_Model", vocabSize).to(Settings.Device);
-        if (File.Exists(Settings.SaveLocation))
+        if (File.Exists(Settings.SaveLocation(vocabSize)))
         {
-            model.load(Settings.SaveLocation);
+            model.load(Settings.SaveLocation(vocabSize));
         }
-        model.eval();
-
-        // Timestamp: 32:15
-        Tensor context = torch.zeros(new long[] { 1, 1 }, dtype: torch.ScalarType.Int64).to(Settings.Device);
-        foreach (var token in model.Generate(context, maxNewTokens: 100000))
-        {
-            Console.Write(tokenEncoder.Decode(token));
-        }
-        Console.WriteLine("\n\n--Complete--");
+        model.GenerateAndPrint(tokenEncoder, int.MaxValue);
     }
 
 
@@ -621,6 +619,8 @@ public sealed class GptLanguageModel : torch.nn.Module
 
     public IEnumerable<short> Generate(Tensor allGeneratedTokens, int maxNewTokens)
     {
+        using var noGrad = torch.no_grad();
+        eval();
         // in video max new tokens was the context window but that was slowing things down a lot for me
         const int contextWindow = 200;
 
@@ -647,5 +647,20 @@ public sealed class GptLanguageModel : torch.nn.Module
             allGeneratedTokens = torch.cat(new[] { allGeneratedTokens, newlyGeneratedToken }, 1);
             yield return (short) newlyGeneratedToken.item<long>();
         }
+        train();
+    }
+
+    public void GenerateAndPrint(TokenEncoder tokenEncoder, int maxNewTokens)
+    {
+        Console.WriteLine("\n====Generating:====\n");
+
+        // Timestamp: 32:15
+        Tensor context = torch.zeros(new long[] { 1, 1 }, dtype: torch.ScalarType.Int64).to(Settings.Device);
+        foreach (var token in Generate(context, maxNewTokens))
+        {
+            Console.Write(tokenEncoder.Decode(token));
+        }
+
+        Console.WriteLine("\n\n====Generation Completed====\n");
     }
 }
